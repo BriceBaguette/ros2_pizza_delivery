@@ -29,3 +29,11 @@ ros2 run turtlebot3_teleop teleop_keyboard
 6. Run our node with
 
 ros2 run ros2_pizza_delivery pizza_pos_node
+
+
+# Destexhe notes 
+
+ - ros2 topic list => show the opened nodes 
+
+To update the code on ubuntu, go to the file where the pizza_delivery has been installed and pool the github 
+ - git pull 
