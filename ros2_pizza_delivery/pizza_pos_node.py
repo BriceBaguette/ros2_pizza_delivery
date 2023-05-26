@@ -26,7 +26,7 @@ from ros2_aruco import transformations
 
 from geometry_msgs.msg import PoseArray, Pose
 from tf2_ros import Buffer, TransformListener
-from ros2_pizza_delivery_interfaces.msg import PizzaPose
+from ros2_pizza_interfaces.msg import PizzaPose
 
 class PizzaPosNode(rclpy.node.Node):
 
