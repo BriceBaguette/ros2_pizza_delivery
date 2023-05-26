@@ -26,28 +26,35 @@ from ros2_aruco import transformations
 
 from geometry_msgs.msg import PoseArray, Pose
 from ros2_aruco_interfaces.msg import ArucoMarkers
+from ros2_pizza_delivery_interfaces.msg import PizzaPose
 
 class PizzaPosNode(rclpy.node.Node):
 
-    def __init__(self):
+    def __init__(self, nb_marker):
         super().__init__('pizza_pos_node')
         self.marker_sub = self.create_subscription(ArucoMarkers,
                                                        '/aruco_markers',
                                                        self.callback,
                                                        10)
-        
+        self.publisher = self.create_publisher(
+            PizzaPose,
+            'pizza_pos',
+            10
+        )
         self.pizza_pos = dict()
-        
+        self.nb_marker = nb_marker
     def callback(self, data):
         for i in range(len(data.marker_ids)):
             self.pos_sub = self.create_subscription
             if(data.marker_ids[i] not in self.pizza_pos):
                 self.get_logger().info("%s" %data)
                 self.pizza_pos[data.marker_ids[i]] = data.poses
+                if(len(self.pizza_pos) == self.nb_marker):
+                    self.publisher.publish_msg(self.pizza_pos)
 
-def main():
-    rclpy.init()
-    node = PizzaPosNode()
+def main(args):
+    rclpy.init(args)
+    node = PizzaPosNode(args[1])
     rclpy.spin(node)
 
     node.destroy_node()
