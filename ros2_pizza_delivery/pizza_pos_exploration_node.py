@@ -25,26 +25,32 @@ import cv2
 from ros2_aruco import transformations
 
 from geometry_msgs.msg import PoseArray, Pose
-from tf2_ros import Buffer, TransformListener
+from ros2_aruco_interfaces.msg import ArucoMarkers
 from ros2_pizza_delivery_interfaces.msg import PizzaPose
 
 class PizzaPosNode(rclpy.node.Node):
 
     def __init__(self, nb_marker):
         super().__init__('pizza_pos_node')
+        self.marker_sub = self.create_subscription(ArucoMarkers,
+                                                       '/aruco_markers',
+                                                       self.callback,
+                                                       10)
         self.publisher = self.create_publisher(
             PizzaPose,
             'pizza_pos',
             10
         )
-        self.tf_buffer = Buffer()
         self.pizza_pos = dict()
         self.nb_marker = nb_marker
-        self.callback()
 
-    def callback(self):
-        for i in range(self.nb_marker):
-            self.get_logger(self.tf_buffer.lookupTransform('map','aruco_'+i, rclpy.time.Time()))
+    def callback(self, data):
+        for i in range(len(data.marker_ids)):
+            if(data.marker_ids[i] not in self.pizza_pos):
+                self.get_logger().info("%s" %data)
+                self.pizza_pos[data.marker_ids[i]] = data.poses
+                if(len(self.pizza_pos) == self.nb_marker):
+                    self.publisher.publish_msg(self.pizza_pos)
 
 def main(args):
     rclpy.init(args)

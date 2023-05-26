@@ -3,6 +3,7 @@ from rclpy.node import Node
 from nav_msgs.msg import OccupancyGrid, Path
 from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import Header
+from ros2_pizza_interfaces.msg import PizzaPose
 import heapq
 
 
@@ -23,8 +24,17 @@ class PathPlannerNode(Node):
             10
         )
 
+        self.subscription = self.create_subscription(
+            PizzaPose,
+            'pizza_pose',
+            self.pose_callback(),
+            10
+        )
         self.map = None
-        self.waypoints = []
+        self.waypoints = dict
+
+    def pose_callback(self,msg):
+        self.waypoints = msg.poses
 
     def map_callback(self, msg):
         self.map = msg
