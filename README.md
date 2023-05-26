@@ -1,16 +1,19 @@
 1. Launch the map in 1st terminal with:
 
 export TURTLEBOT3_MODEL="burger"
+
 ros2 launch gazebo_ros gazebo.launch.py world:="~/Downloads/map.sdf"
 
 2. Launch the state publisher in another terminal to get information from nodes
 
 export TURTLEBOT3_MODEL="burger"
+
 ros2 launch turtlebot3_bringup turtlebot3_state_publisher.launch.py use_sim_time:=true
 
 3. Launch aruco node to get position and to scan the qr code.
 
 source install/setup.bash
+
 ros2 run ros2_aruco aruco_node
 
 4. Launch the cartographer
