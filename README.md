@@ -22,6 +22,8 @@ ros2 launch turtlebot3_cartographer cartographer.launch.py use_sim_time:=True
 
 5. Launch the teleop 
 
+export TURTLEBOT3_MODEL="burger"
+
 ros2 run turtlebot3_teleop teleop_keyboard
 
 6. Run our node with
