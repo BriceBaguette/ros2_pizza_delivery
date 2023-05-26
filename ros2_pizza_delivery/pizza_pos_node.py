@@ -35,10 +35,12 @@ class PizzaPosNode(rclpy.node.Node):
                                                        '/aruco_markers',
                                                        self.callback,
                                                        10)
+        
         self.pizza_pos = dict()
         
     def callback(self, data):
         for i in range(len(data.marker_ids)):
+            self.pos_sub = self.create_subscription
             if(data.marker_ids[i] not in self.pizza_pos):
                 self.get_logger().info("%s" %data)
                 self.pizza_pos[data.marker_ids[i]] = data.poses
