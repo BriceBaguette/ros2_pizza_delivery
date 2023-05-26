@@ -24,7 +24,7 @@ class PathPlannerNode(Node):
         )
 
         self.map = None
-        self.waypoints = [(1, 1), (3, 2), (5, 5)]  # Replace with your own list of waypoints
+        self.waypoints = []
 
     def map_callback(self, msg):
         self.map = msg
