@@ -21,6 +21,8 @@ setup(
     entry_points={
         'console_scripts': [
              'pizza_pos_node = ros2_pizza_delivery.pizza_pos_node:main',
+             'path_planner_node = ros2_pizza_delivery.path_planner_node:main',
+             'pizza_delivery_node = ros2_pizza_delivery.pizza_delivery_node:main', 
         ],
     },
 )

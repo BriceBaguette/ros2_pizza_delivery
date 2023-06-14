@@ -26,31 +26,32 @@ from ros2_aruco import transformations
 
 from geometry_msgs.msg import PoseArray, Pose
 from tf2_ros import Buffer, TransformListener
-from ros2_pizza_interfaces.msg import PizzaPose
+#from ros2_pizza_interfaces.msg import PizzaPose
 
 class PizzaPosNode(rclpy.node.Node):
 
-    def __init__(self, nb_marker):
+    def __init__(self):
         super().__init__('pizza_pos_node')
-        self.publisher = self.create_publisher(
-            PizzaPose,
-            'pizza_pos',
-            10
-        )
+        #self.publisher = self.create_publisher(
+        #    PizzaPose,
+        #    'pizza_pos',
+        #    10
+        #)
         self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
         self.pizza_pos = dict()
-        self.nb_marker = nb_marker
+        self.nb_marker = 10
         self.callback()
 
     def callback(self):
         for i in range(self.nb_marker):
-            self.get_logger(self.tf_buffer.lookupTransform('map','aruco_'+i, rclpy.time.Time()))
+            transform = self.tf_buffer.lookup_transform('map','aruco_'+str(i), rclpy.time.Time(), timeout=rclpy.duration.Duration(seconds=0.1))
+            print(transform)
 
-def main(args):
-    rclpy.init(args)
-    node = PizzaPosNode(args[1])
+def main():
+    rclpy.init()
+    node = PizzaPosNode()
     rclpy.spin(node)
-
     node.destroy_node()
     rclpy.shutdown()
 
