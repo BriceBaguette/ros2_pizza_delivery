@@ -2,11 +2,14 @@ from numpy import size
 import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Path, OccupancyGrid
-from geometry_msgs.msg import PoseStamped, Pose, Point
+from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion, TransformStamped
 from std_msgs.msg import Header
+
+import numpy as np
+import tf2_ros
 # from ros2_pizza_interfaces.msg import PizzaPose
-import heapq
 import yaml
+import math
 
 class PathPlannerNode(Node):
     def __init__(self):
@@ -15,7 +18,7 @@ class PathPlannerNode(Node):
 
         self.occupancy_grid = OccupancyGrid
         self.matrix_map = []
-
+        self.waypoints = []
         self.subscription = self.create_subscription(
             OccupancyGrid,
             'map',
@@ -23,9 +26,12 @@ class PathPlannerNode(Node):
             10
         )
 
+        self.tf_buffer = tf2_ros.Buffer()
+        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
+
         self.publisher = self.create_publisher(
             Path,
-            'path',
+            'pizza_path',
             10
         )
 
@@ -35,18 +41,42 @@ class PathPlannerNode(Node):
         #   self.pose_callback(),
         #   10
         #)
-        self.waypoints = [
-            Pose(
-                position=Point(x=1.028060, y=1.737860, z=0.149815),
-            ),
-            Pose(
-                position=Point(x=0.676417, y=0.026173, z=0.149815),
-            ),
-            Pose(
-                position=Point(x=0.620023, y=1.416080, z=0.149815)
-            )
-        ]
-        #self.get_path()
+
+    def pose_callback(self):
+        success = False
+        while not success:
+            try:
+                transform = self.tf_buffer.lookup_transform(
+                    'map',  # Target frame (map frame in this example)
+                    'base_footprint',  # Source frame (base_link frame in this example)
+                    rclpy.time.Time().to_msg(),  # Use latest available transform
+                    timeout=rclpy.duration.Duration(seconds=1)
+                )
+                # Access the pose information
+                pose = transform.transform
+                self.waypoints = [Pose(position=Point(x = pose.translation.x, y= pose.translation.y, z= pose.translation.z), orientation=pose.rotation)]
+                
+                quaternion1 = self.euler_to_quaternion(0.000400, 1.570000, 1.570396)
+                quaternion2 = self.euler_to_quaternion(0.005486,1.570000,2.618564)
+                self.waypoints.extend([Pose(
+                    position=Point(x=0.676417, y=0.026173, z=0.149815),
+                    orientation=quaternion1
+                ),
+                #Pose(
+                #    position=Point(x=1.028060, y=1.737860, z=0.149815),
+                #    orientation=Quaternion( x = 0.000000,
+                #                            y = 1.570000,
+                #                            z = 0.000000,
+                #                            w = 0.0)
+                #),
+                Pose(
+                   position=Point(x=0.620023, y=1.416080, z=0.149815),
+                   orientation=quaternion2)
+                ])
+                success = True
+            except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+                # Handle exceptions
+                self.get_logger().warning('Failed to retrieve TurtleBot3 pose')
 
     def load_map(self, msg):
         self.occupancy_grid = msg
@@ -62,91 +92,54 @@ class PathPlannerNode(Node):
                 map_value = map_data[index]
                 if map_value == 100:
                     matrix[y][x] = 1  # Represents a wall or obstacle
-        print(size(matrix))
         self.matrix_map = matrix
+        if len(self.waypoints)==0:
+            self.pose_callback()
         self.get_path()
 
-    def pose_callback(self,msg):
-        self.waypoints = msg.poses
-
     def get_path(self):
-        self.waypoints
-        path = self.astar_path_planning(self.waypoints)
-        self.publish_path(path)
+            matrix_representation = [self.pose_to_occupancy_grid(pose) for pose in self.waypoints]
+            path = self.find_best_order(matrix_representation)
+            converted_path = [self.occupancy_grid_to_pose(pose[0], pose[1], pose[2], pose[3]) for pose in path]
+            self.publish_path(converted_path)
 
-    def astar_path_planning(self, waypoints):
-        start = waypoints[0]
-        goal = waypoints[-1]
+    def calculate_distance(self, point1, point2):
+        """Calculate the Euclidean distance between two points."""
+        dx = point2[0] - point1[0]
+        dy = point2[1] - point1[1]
+        distance = math.sqrt(dx**2 + dy**2)
+        return distance
 
-        open_list = []
-        closed_set = set()
+    def find_best_order(self, waypoints):
+        """Find the best order to visit the list of waypoints."""
+        num_waypoints = len(waypoints)
+        best_order = []
 
-        start_node = Node(start, 0, self.calculate_heuristic(start, goal))
-        heapq.heappush(open_list, start_node)
+        # Start with the first waypoint as the initial current position
+        current_position = waypoints[0]
+        best_order.append(current_position)
 
-        while open_list:
-            current_node = heapq.heappop(open_list)
+        # Continue until all waypoints have been visited
+        while len(best_order) < num_waypoints:
+            closest_distance = float('inf')
+            closest_point = None
 
-            if current_node.position == goal:
-                return self.extract_path(current_node)
+            # Find the closest unvisited waypoint
+            for waypoint in waypoints:
+                if waypoint not in best_order:
+                    distance = self.calculate_distance(current_position, waypoint)
+                    if distance < closest_distance:
+                        closest_distance = distance
+                        closest_point = waypoint
 
-            closed_set.add(current_node.position)
+            # Update the current position and add the closest waypoint to the best order
+            current_position = closest_point
+            best_order.append(current_position)
 
-            for neighbor in self.get_neighbors(current_node.position):
-                if neighbor in closed_set:
-                    continue
-
-                neighbor_node = Node(neighbor, current_node.g_cost + self.calculate_distance(current_node, neighbor),
-                                     self.calculate_heuristic(neighbor, goal), current_node)
-                heapq.heappush(open_list, neighbor_node)
-
-        return []
-
-    def get_neighbors(self, position):
-        neighbors = []
-        map_width = self.map.info.width
-        map_height = self.map.info.height
-
-        # Define the threshold value for considering a cell as an obstacle
-        obstacle_threshold = 50
-
-        # Define the indices of the neighboring cells
-        indices = [(-1, 0), (1, 0), (0, -1), (0, 1)]  # Up, Down, Left, Right
-
-        for dx, dy in indices:
-            nx = position[0] + dx
-            ny = position[1] + dy
-
-            # Check if the neighboring cell is within the map boundaries
-            if 0 <= nx < map_width and 0 <= ny < map_height:
-                # Check the occupancy value of the neighboring cell
-                cell_value = self.map_matrix[ny][nx]
-
-                # Exclude the cell if it is marked as an obstacle
-                if cell_value < obstacle_threshold:
-                    neighbors.append((nx, ny))
-
-        return neighbors
-
-
-    def calculate_distance(self, node1, node2):
-        return ((node1[0] - node2[0]) ** 2 + (node1[1] - node2[1]) ** 2) ** 0.5
-
-    def calculate_heuristic(self, node, goal):
-        return self.calculate_distance(node, goal)
-
-    def extract_path(self, goal_node):
-        path = []
-        current_node = goal_node
-
-        while current_node:
-            path.append(current_node.position)
-            current_node = current_node.parent
-
-        path.reverse()
-        return path
+        return best_order
 
     def publish_path(self, path):
+        del path[0]
         path_msg = Path()
         path_msg.header = Header()
         path_msg.header.frame_id = 'map'
@@ -155,15 +148,12 @@ class PathPlannerNode(Node):
             pose = PoseStamped()
             pose.header = Header()
             pose.header.frame_id = 'map'
-            pose.pose.position.x = position[0]
-            pose.pose.position.y = position[1]
-            pose.pose.orientation.w = 1.0
+            pose.pose = self.get_pose_in_front(position, 0.20)
 
             path_msg.poses.append(pose)
-
         self.publisher.publish(path_msg)
     
-    def occupancy_grid_to_pose(self, grid_x, grid_y):
+    def occupancy_grid_to_pose(self, grid_x, grid_y, z, orientation):
         resolution = self.occupancy_grid.info.resolution
         origin_x = self.occupancy_grid.info.origin.position.x
         origin_y = self.occupancy_grid.info.origin.position.y
@@ -174,6 +164,9 @@ class PathPlannerNode(Node):
         pose = Pose()
         pose.position.x = pose_x
         pose.position.y = pose_y
+        pose.position.z = z
+        pose.orientation = orientation
+        print(pose)
 
         return pose
     
@@ -188,7 +181,78 @@ class PathPlannerNode(Node):
         grid_x = int((pose_x - origin_x) / resolution)
         grid_y = int((pose_y - origin_y) / resolution)
 
-        return grid_x, grid_y
+        return grid_x, grid_y, pose.position.z, pose.orientation
+
+    def get_pose_in_front(self, pose, distance):
+        # Extract position and orientation from the given pose
+        position = pose.position
+        orientation = self.quaternion_to_euler(pose.orientation)
+
+        # Calculate the displacement in the x and y directions based on the orientation
+        dx = math.cos(orientation[2]) * distance
+        dy = math.sin(orientation[2]) * distance
+
+        # Calculate the new position in front of the original pose
+        new_position = Point()
+        new_position.x = position.x + dx
+        new_position.y = position.y + dy
+        new_position.z = position.z
+
+        # Create a new Pose object with the calculated position and the opposite orientation
+        new_pose = Pose()
+        new_pose.position = new_position
+        new_pose.orientation = self.euler_to_quaternion(-orientation[2],orientation[1],orientation[0])
+
+        return new_pose
+
+    def convert_pose_list(self, pose_list, distance):
+        converted_list = []
+
+        for pose in pose_list:
+            new_pose = self.get_pose_in_front(pose, distance)
+            converted_list.append(new_pose)
+
+        return converted_list
+
+
+
+    def quaternion_to_euler(self,quaternion):
+        """
+        Convert quaternion to Euler angles (roll, pitch, yaw).
+
+        :param quaternion: geometry_msgs.msg.Quaternion representing the quaternion.
+        :return: Tuple of Euler angles (roll, pitch, yaw) in radians.
+        """
+        q = np.array([quaternion.x, quaternion.y, quaternion.z, quaternion.w])
+        roll = math.atan2(2 * (q[3] * q[0] + q[1] * q[2]), 1 - 2 * (q[0]**2 + q[1]**2))
+        pitch = math.asin(2 * (q[3] * q[1] - q[2] * q[0]))
+        yaw = math.atan2(2 * (q[3] * q[2] + q[0] * q[1]), 1 - 2 * (q[1]**2 + q[2]**2))
+        return roll, pitch, yaw
+
+
+    def euler_to_quaternion(self,roll, pitch, yaw):
+        """
+        Convert Euler angles (roll, pitch, yaw) to quaternion.
+
+        :param roll: Roll angle in radians.
+        :param pitch: Pitch angle in radians.
+        :param yaw: Yaw angle in radians.
+        :return: geometry_msgs.msg.Quaternion representing the quaternion.
+        """
+        cy = math.cos(yaw * 0.5)
+        sy = math.sin(yaw * 0.5)
+        cp = math.cos(pitch * 0.5)
+        sp = math.sin(pitch * 0.5)
+        cr = math.cos(roll * 0.5)
+        sr = math.sin(roll * 0.5)
+
+        quaternion = Quaternion()
+        quaternion.x = sr * cp * cy - cr * sp * sy
+        quaternion.y = cr * sp * cy + sr * cp * sy
+        quaternion.z = cr * cp * sy - sr * sp * cy
+        quaternion.w = cr * cp * cy + sr * sp * sy
+        return quaternion
+
 
 
 def main(args=None):
