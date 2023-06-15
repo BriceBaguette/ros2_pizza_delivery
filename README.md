@@ -32,11 +32,13 @@ ros2 run turtlebot3_teleop teleop_keyboard
 7. Run the nav2 node
 
 export TURTLEBOT3_MODEL=burger
+
 ros2 launch turtlebot3_navigation2 navigation2.launch.py map:=~/Downloads/map.yaml
 
 8. Run our nodes with
 
 source install/setup.bash
+
 ros2 run ros2_pizza_delivery pizza_pos_node
 
 
