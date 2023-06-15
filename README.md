@@ -10,7 +10,7 @@ export TURTLEBOT3_MODEL="burger"
 
 ros2 launch turtlebot3_bringup turtlebot3_state_publisher.launch.py use_sim_time:=true
 
-3. Launch aruco node to get position and to scan the qr code.
+3. In another terminal, launch aruco node to get position and to scan the qr code.
 
 source install/setup.bash
 
@@ -32,11 +32,13 @@ ros2 run turtlebot3_teleop teleop_keyboard
 7. Run the nav2 node
 
 export TURTLEBOT3_MODEL=burger
+
 ros2 launch turtlebot3_navigation2 navigation2.launch.py map:=~/Downloads/map.yaml
 
 8. Run our nodes with
 
 source install/setup.bash
+
 ros2 run ros2_pizza_delivery pizza_pos_node
 
 
