@@ -10,7 +10,7 @@ export TURTLEBOT3_MODEL="burger"
 
 ros2 launch turtlebot3_bringup turtlebot3_state_publisher.launch.py use_sim_time:=true
 
-3. Launch aruco node to get position and to scan the qr code.
+3. In another terminal, launch aruco node to get position and to scan the qr code.
 
 source install/setup.bash
 
