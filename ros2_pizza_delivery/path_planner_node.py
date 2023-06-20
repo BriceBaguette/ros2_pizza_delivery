@@ -14,8 +14,6 @@ import math
 class PathPlannerNode(Node):
     def __init__(self):
         super().__init__('path_planner_node')
-
-
         self.occupancy_grid = OccupancyGrid
         self.matrix_map = []
         self.waypoints = []
@@ -25,16 +23,13 @@ class PathPlannerNode(Node):
             self.load_map,
             10
         )
-
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
-
         self.publisher = self.create_publisher(
             Path,
             'pizza_path',
             10
         )
-
         #self.subscription = self.create_subscription(
         #    PizzaPose,
         #    'pizza_pose',
@@ -55,25 +50,34 @@ class PathPlannerNode(Node):
                 # Access the pose information
                 pose = transform.transform
                 self.waypoints = [Pose(position=Point(x = pose.translation.x, y= pose.translation.y, z= pose.translation.z), orientation=pose.rotation)]
-                
+                """
                 quaternion1 = self.euler_to_quaternion(0.000400, 1.570000, 1.570396)
                 quaternion2 = self.euler_to_quaternion(0.005486,1.570000,2.618564)
                 self.waypoints.extend([Pose(
                     position=Point(x=0.676417, y=0.026173, z=0.149815),
                     orientation=quaternion1
                 ),
-                #Pose(
-                #    position=Point(x=1.028060, y=1.737860, z=0.149815),
-                #    orientation=Quaternion( x = 0.000000,
-                #                            y = 1.570000,
-                #                            z = 0.000000,
-                #                            w = 0.0)
-                #),
+                
                 Pose(
-                   position=Point(x=0.620023, y=1.416080, z=0.149815),
-                   orientation=quaternion2)
+                    position=Point(x=1.028060, y=1.737860, z=0.149815),
+                    orientation=Quaternion( x = 0.000000,
+                                            y = 1.570000,
+                                            z = 0.000000,
+                                            w = 0.0)
+                ),
+
+                Pose(
+                position=Point(x=0.620023, y=1.416080, z=0.149815),
+                orientation=quaternion2)
                 ])
+                """
+                """
+                for i in range(self.nb_marker):
+                    transform = self.tf_buffer.lookup_transform('map','aruco_'+str(i), rclpy.time.Time(), timeout=rclpy.duration.Duration(seconds=0.1))
+                    print(transform)
+                """
                 success = True
+                
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
                 # Handle exceptions
                 self.get_logger().warning('Failed to retrieve TurtleBot3 pose')
@@ -148,7 +152,7 @@ class PathPlannerNode(Node):
             pose = PoseStamped()
             pose.header = Header()
             pose.header.frame_id = 'map'
-            pose.pose = self.get_pose_in_front(position, 0.20)
+            pose.pose = self.get_pose_in_front(position, 0.2)
 
             path_msg.poses.append(pose)
         self.publisher.publish(path_msg)
@@ -166,7 +170,6 @@ class PathPlannerNode(Node):
         pose.position.y = pose_y
         pose.position.z = z
         pose.orientation = orientation
-        print(pose)
 
         return pose
     
@@ -187,6 +190,7 @@ class PathPlannerNode(Node):
         # Extract position and orientation from the given pose
         position = pose.position
         orientation = self.quaternion_to_euler(pose.orientation)
+        print(orientation)
 
         # Calculate the displacement in the x and y directions based on the orientation
         dx = math.cos(orientation[2]) * distance
@@ -201,8 +205,7 @@ class PathPlannerNode(Node):
         # Create a new Pose object with the calculated position and the opposite orientation
         new_pose = Pose()
         new_pose.position = new_position
-        new_pose.orientation = self.euler_to_quaternion(-orientation[2],orientation[1],orientation[0])
-
+        new_pose.orientation = self.euler_to_quaternion(0,0,(math.pi + orientation[0]))
         return new_pose
 
     def convert_pose_list(self, pose_list, distance):
